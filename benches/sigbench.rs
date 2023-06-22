@@ -41,6 +41,41 @@ static SIGNATURES: &[(&str, &str)] = &[
     ("sousbasssss", "(sousbasssss)"),
 ];
 
+pub(crate) fn without_outer_parentheses(sig: &str) -> Option<&[u8]> {
+    if sig_str.starts_with('(') && sig_str.ends_with(')') {
+        let subslice = self.slice(1..self.len() - 1);
+
+        if subslice.chars().fold(0, |count, ch| match ch {
+            '(' => count + 1,
+            ')' if count != 0 => count - 1,
+            _ => count,
+        }) == 0
+        {
+            return Some(subslice);
+        }
+    };
+
+    None
+}
+pub(crate) fn without_outer_parentheses_bytes(sig: &str) -> Option<&str> {
+    let sig_str = self.as_str();
+
+    if sig_str.starts_with('(') && sig_str.ends_with(')') {
+        let subslice = self.slice(1..self.len() - 1);
+
+        if subslice.chars().fold(0, |count, ch| match ch {
+            '(' => count + 1,
+            ')' if count != 0 => count - 1,
+            _ => count,
+        }) == 0
+        {
+            return Some(subslice);
+        }
+    };
+
+    None
+}
+
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
 }
