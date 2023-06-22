@@ -41,6 +41,15 @@ static SIGNATURES: &[(&str, &str)] = &[
     ("sousbasssss", "(sousbasssss)"),
 ];
 
+static COMPLEX_PAIR: (&str, &str) = (
+    "soy(ba{v})soy(ba{v})soyba{v}soyba{v}",
+    "(soy(ba{v})soy(ba{v})soyba{v}soyba{v})",
+);
+
+static MEDIUM_PAIR: (&str, &str) = ("susuassusau(o)", "(susuassussau(o))");
+
+static SIMPLE_PAIR: (&str, &str) = ("ii", "(ii)");
+
 pub(crate) fn without_outer_parentheses_chars(sig: &str) -> Option<&str> {
     if sig.starts_with('(') && sig.ends_with(')') {
         let subslice = sig.get(1..sig.len() - 1).unwrap();
@@ -57,6 +66,7 @@ pub(crate) fn without_outer_parentheses_chars(sig: &str) -> Option<&str> {
 
     None
 }
+
 pub(crate) fn without_outer_parentheses_bytes(sig: &str) -> Option<&[u8]> {
     if let [b'(', subslice @ .., b')'] = sig.as_bytes() {
         if subslice.iter().fold(0, |count, ch| match ch {
@@ -96,17 +106,18 @@ fn is_equal_bytes(sigpair: (&str, &str)) -> bool {
     }
 }
 
-fn char_wise(c: &mut Criterion) {
+fn char_wise_complex(c: &mut Criterion) {
     c.bench_function("with chars", |b| {
         b.iter(|| {
-            for sigpair in SIGNATURES {
-                black_box(is_equal_chars(*sigpair));
-            }
+            //             for sigpair in SIGNATURES {
+            //                 black_box(is_equal_chars(*sigpair));
+            //             }
+            black_box(is_equal_chars(COMPLEX_PAIR));
         })
     });
 }
 
-fn byte_wise(c: &mut Criterion) {
+fn byte_wise_list(c: &mut Criterion) {
     c.bench_function("with bytes", |b| {
         b.iter(|| {
             for sigpair in SIGNATURES {
@@ -116,5 +127,65 @@ fn byte_wise(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, char_wise, byte_wise);
+fn char_wise_list(c: &mut Criterion) {
+    c.bench_function("with chars", |b| {
+        b.iter(|| {
+            for sigpair in SIGNATURES {
+                black_box(is_equal_chars(*sigpair));
+            }
+        })
+    });
+}
+
+fn byte_wise_complex(c: &mut Criterion) {
+    c.bench_function("with bytes", |b| {
+        b.iter(|| {
+            black_box(is_equal_bytes(COMPLEX_PAIR));
+        })
+    });
+}
+
+fn char_wise_medium(c: &mut Criterion) {
+    c.bench_function("with chars", |b| {
+        b.iter(|| {
+            black_box(is_equal_chars(MEDIUM_PAIR));
+        })
+    });
+}
+
+fn byte_wise_medium(c: &mut Criterion) {
+    c.bench_function("with bytes", |b| {
+        b.iter(|| {
+            black_box(is_equal_bytes(MEDIUM_PAIR));
+        })
+    });
+}
+
+fn char_wise_simple(c: &mut Criterion) {
+    c.bench_function("with chars", |b| {
+        b.iter(|| {
+            black_box(is_equal_chars(SIMPLE_PAIR));
+        })
+    });
+}
+
+fn byte_wise_simple(c: &mut Criterion) {
+    c.bench_function("with bytes", |b| {
+        b.iter(|| {
+            black_box(is_equal_bytes(SIMPLE_PAIR));
+        })
+    });
+}
+
+criterion_group!(
+    benches,
+    char_wise_list,
+    byte_wise_list,
+    char_wise_complex,
+    byte_wise_complex,
+    char_wise_medium,
+    byte_wise_medium,
+    char_wise_simple,
+    byte_wise_simple
+);
 criterion_main!(benches);
