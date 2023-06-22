@@ -1,6 +1,28 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
-// A list of 10 random DBus signature string pairs of different lengths, with and without outer parentheses.
+#[derive(Debug, Clone, Copy)]
+struct D<'a, 'b>(&'a str, &'b str);
+
+impl<'a, 'b> From<D<'a, 'b>> for (&'a str, &'b str) {
+    fn from(d: D<'a, 'b>) -> Self {
+        let D(sig_a, sig_b) = d;
+        (sig_a, sig_b)
+    }
+}
+
+impl<'a, 'b> std::fmt::Display for D<'a, 'b> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let D(sig_a, sig_b) = self;
+        write!(f, "({sig_a}, {sig_b})")
+    }
+}
+
+impl<'a, 'b> From<(&'a str, &'b str)> for D<'a, 'b> {
+    fn from(sigpair: (&'a str, &'b str)) -> Self {
+        D(sigpair.0, sigpair.1)
+    }
+}
+
 static SIGNATURES: &[(&str, &str)] = &[
     ("ii", "(ii)"),
     ("so(ii)", "(so(ii))"),
@@ -106,86 +128,48 @@ fn is_equal_bytes(sigpair: (&str, &str)) -> bool {
     }
 }
 
-fn char_wise_complex(c: &mut Criterion) {
-    c.bench_function("with chars", |b| {
-        b.iter(|| {
-            //             for sigpair in SIGNATURES {
-            //                 black_box(is_equal_chars(*sigpair));
-            //             }
-            black_box(is_equal_chars(COMPLEX_PAIR));
-        })
-    });
+pub fn bench_eq(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Single Signatures");
+    let data = vec![SIMPLE_PAIR, MEDIUM_PAIR, COMPLEX_PAIR];
+    for pair in data.iter().map(|pair| D::from(*pair)) {
+        group.bench_with_input(BenchmarkId::new("as_bytes", pair), &pair, |b, pair| {
+            let (str_a, str_b) = (*pair).into();
+            b.iter(|| {
+                black_box(is_equal_bytes((str_a, str_b)));
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("as_char", pair), &pair, |b, pair| {
+            let (str_a, str_b) = (*pair).into();
+            b.iter(|| {
+                black_box(is_equal_chars((str_a, str_b)));
+            });
+        });
+    }
+    group.finish();
 }
 
-fn byte_wise_list(c: &mut Criterion) {
-    c.bench_function("with bytes", |b| {
-        b.iter(|| {
-            for sigpair in SIGNATURES {
-                black_box(is_equal_bytes(*sigpair));
-            }
-        })
-    });
+fn bench_eq_list(c: &mut Criterion) {
+    let mut group = c.benchmark_group("List of Signatures");
+    let pairs = Vec::from(SIGNATURES);
+
+    for pair in pairs.iter().map(|pair| D::from(*pair)) {
+        group.bench_with_input(BenchmarkId::new("as_bytes", pair), &pair, |b, pair| {
+            let (str_a, str_b) = (*pair).into();
+            b.iter(|| {
+                black_box(is_equal_bytes((str_a, str_b)));
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("as_chars", pair), &pair, |b, pair| {
+            b.iter(|| {
+                let (str_a, str_b) = (*pair).into();
+                black_box(is_equal_chars((str_a, str_b)));
+            });
+        });
+    }
+    group.finish();
 }
 
-fn char_wise_list(c: &mut Criterion) {
-    c.bench_function("with chars", |b| {
-        b.iter(|| {
-            for sigpair in SIGNATURES {
-                black_box(is_equal_chars(*sigpair));
-            }
-        })
-    });
-}
-
-fn byte_wise_complex(c: &mut Criterion) {
-    c.bench_function("with bytes", |b| {
-        b.iter(|| {
-            black_box(is_equal_bytes(COMPLEX_PAIR));
-        })
-    });
-}
-
-fn char_wise_medium(c: &mut Criterion) {
-    c.bench_function("with chars", |b| {
-        b.iter(|| {
-            black_box(is_equal_chars(MEDIUM_PAIR));
-        })
-    });
-}
-
-fn byte_wise_medium(c: &mut Criterion) {
-    c.bench_function("with bytes", |b| {
-        b.iter(|| {
-            black_box(is_equal_bytes(MEDIUM_PAIR));
-        })
-    });
-}
-
-fn char_wise_simple(c: &mut Criterion) {
-    c.bench_function("with chars", |b| {
-        b.iter(|| {
-            black_box(is_equal_chars(SIMPLE_PAIR));
-        })
-    });
-}
-
-fn byte_wise_simple(c: &mut Criterion) {
-    c.bench_function("with bytes", |b| {
-        b.iter(|| {
-            black_box(is_equal_bytes(SIMPLE_PAIR));
-        })
-    });
-}
-
-criterion_group!(
-    benches,
-    char_wise_list,
-    byte_wise_list,
-    char_wise_complex,
-    byte_wise_complex,
-    char_wise_medium,
-    byte_wise_medium,
-    char_wise_simple,
-    byte_wise_simple
-);
+criterion_group!(benches, bench_eq, bench_eq_list);
 criterion_main!(benches);
