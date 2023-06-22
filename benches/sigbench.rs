@@ -23,56 +23,15 @@ impl<'a, 'b> From<(&'a str, &'b str)> for D<'a, 'b> {
     }
 }
 
-static SIGNATURES: &[(&str, &str)] = &[
-    ("ii", "(ii)"),
-    ("so(ii)", "(so(ii))"),
-    ("(so)(so)(so)", "((so)(so)(so))"),
-    ("(so)yb(so)", "((so)yb(so))"),
-    ("sss(o)", "(sss(o))"),
-    ("(((o)))", "(o)"),
-    ("((o))", "(o)"),
-    ("siiva{si}so", "(siiva{si}so)"),
-    ("siiva{si}so", "siiva{si}so"),
-    (
-        "siiva{si}sosiiva{si}sosiiva{si}so",
-        "(siiva{si}sosiiva{si}sosiiva{si}so)",
-    ),
-    ("susuassusau(o)", "susuassussau(o)"),
-    ("susuassusau(o)", "(susuassussau(o))"),
-    ("su(s)((u))assusau(o)", "(su(s)((u))assussau(o))"),
-    (
-        "soyba{v}soyba{v}soyba{v}soyba{v}",
-        "(soyba{v}soyba{v}soyba{v}soyba{v})",
-    ),
-    (
-        "soy(ba{v})soy(ba{v})soyba{v}soyba{v}",
-        "(soy(ba{v})soy(ba{v})soyba{v}soyba{v})",
-    ),
-    ("f", "s"),
-    ("(f)", "(s)"),
-    (")", "("),
-    (")(", ")("),
-    (")))(((", "()()()"),
-    ("sous", "(sous)"),
-    ("sousb", "(sousb)"),
-    ("sousba", "(sousba)"),
-    ("sousbas", "(sousbas)"),
-    ("sousbass", "(sousbass)"),
-    ("sousbasss", "(sousbasss)"),
-    ("sousbassss", "(sousbassss)"),
-    ("sousbasssss", "(sousbasssss)"),
-];
-
-static COMPLEX_PAIR: (&str, &str) = (
-    "soy(ba{v})soy(ba{v})soyba{v}soyba{v}",
-    "(soy(ba{v})soy(ba{v})soyba{v}soyba{v})",
+static LONG_PAIR: (&str, &str) = ("soy(ba{v})soy(ba{v})bbba{v}", "soy(ba{v})soy(ba{v})bbba{v}");
+static LONG_PAIR_NEQ: (&str, &str) = (
+    "soy(ba{v})soy(ba{v})bbba{v}",
+    "soy(ba{v})soy(ba{v})bbba{v}a",
 );
+static MEDIUM_PAIR: (&str, &str) = ("siia{vo}(ss)(o)", "(siia{vo}(ss)(o))");
+static SHORT_PAIR: (&str, &str) = ("ii", "(ii)");
 
-static MEDIUM_PAIR: (&str, &str) = ("susuassusau(o)", "(susuassussau(o))");
-
-static SIMPLE_PAIR: (&str, &str) = ("ii", "(ii)");
-
-pub(crate) fn without_outer_parentheses_chars(sig: &str) -> Option<&str> {
+fn without_outer_parentheses_chars(sig: &str) -> Option<&str> {
     if sig.starts_with('(') && sig.ends_with(')') {
         let subslice = sig.get(1..sig.len() - 1).unwrap();
 
@@ -89,7 +48,7 @@ pub(crate) fn without_outer_parentheses_chars(sig: &str) -> Option<&str> {
     None
 }
 
-pub(crate) fn without_outer_parentheses_bytes(sig: &str) -> Option<&[u8]> {
+fn without_outer_parentheses_bytes(sig: &str) -> Option<&[u8]> {
     if let [b'(', subslice @ .., b')'] = sig.as_bytes() {
         if subslice.iter().fold(0, |count, ch| match ch {
             b'(' => count + 1,
@@ -130,8 +89,16 @@ fn is_equal_bytes(sigpair: (&str, &str)) -> bool {
 
 pub fn bench_eq(c: &mut Criterion) {
     let mut group = c.benchmark_group("Single Signatures");
-    let data = vec![SIMPLE_PAIR, MEDIUM_PAIR, COMPLEX_PAIR];
+    let data = [SHORT_PAIR, MEDIUM_PAIR, LONG_PAIR, LONG_PAIR_NEQ];
+
     for pair in data.iter().map(|pair| D::from(*pair)) {
+        group.bench_with_input(BenchmarkId::new("pre-PR", pair), &pair, |b, pair| {
+            let (str_a, str_b) = (*pair).into();
+            b.iter(|| {
+                black_box(str_a == str_b);
+            });
+        });
+
         group.bench_with_input(BenchmarkId::new("as_bytes", pair), &pair, |b, pair| {
             let (str_a, str_b) = (*pair).into();
             b.iter(|| {
@@ -149,27 +116,5 @@ pub fn bench_eq(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_eq_list(c: &mut Criterion) {
-    let mut group = c.benchmark_group("List of Signatures");
-    let pairs = Vec::from(SIGNATURES);
-
-    for pair in pairs.iter().map(|pair| D::from(*pair)) {
-        group.bench_with_input(BenchmarkId::new("as_bytes", pair), &pair, |b, pair| {
-            let (str_a, str_b) = (*pair).into();
-            b.iter(|| {
-                black_box(is_equal_bytes((str_a, str_b)));
-            });
-        });
-
-        group.bench_with_input(BenchmarkId::new("as_chars", pair), &pair, |b, pair| {
-            b.iter(|| {
-                let (str_a, str_b) = (*pair).into();
-                black_box(is_equal_chars((str_a, str_b)));
-            });
-        });
-    }
-    group.finish();
-}
-
-criterion_group!(benches, bench_eq, bench_eq_list);
+criterion_group!(benches, bench_eq);
 criterion_main!(benches);
