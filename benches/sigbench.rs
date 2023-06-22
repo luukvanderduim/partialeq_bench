@@ -41,9 +41,9 @@ static SIGNATURES: &[(&str, &str)] = &[
     ("sousbasssss", "(sousbasssss)"),
 ];
 
-pub(crate) fn without_outer_parentheses(sig: &str) -> Option<&[u8]> {
-    if sig_str.starts_with('(') && sig_str.ends_with(')') {
-        let subslice = self.slice(1..self.len() - 1);
+pub(crate) fn without_outer_parentheses_chars(sig: &str) -> Option<&str> {
+    if sig.starts_with('(') && sig.ends_with(')') {
+        let subslice = sig.get(1..sig.len() - 1).unwrap();
 
         if subslice.chars().fold(0, |count, ch| match ch {
             '(' => count + 1,
@@ -57,15 +57,11 @@ pub(crate) fn without_outer_parentheses(sig: &str) -> Option<&[u8]> {
 
     None
 }
-pub(crate) fn without_outer_parentheses_bytes(sig: &str) -> Option<&str> {
-    let sig_str = self.as_str();
-
-    if sig_str.starts_with('(') && sig_str.ends_with(')') {
-        let subslice = self.slice(1..self.len() - 1);
-
-        if subslice.chars().fold(0, |count, ch| match ch {
-            '(' => count + 1,
-            ')' if count != 0 => count - 1,
+pub(crate) fn without_outer_parentheses_bytes(sig: &str) -> Option<&[u8]> {
+    if let [b'(', subslice @ .., b')'] = sig.as_bytes() {
+        if subslice.iter().fold(0, |count, ch| match ch {
+            b'(' => count + 1,
+            b')' if count != 0 => count - 1,
             _ => count,
         }) == 0
         {
@@ -76,9 +72,49 @@ pub(crate) fn without_outer_parentheses_bytes(sig: &str) -> Option<&str> {
     None
 }
 
-fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
+fn is_equal_chars(sigpair: (&str, &str)) -> bool {
+    let (sig_a, sig_b) = sigpair;
+    match (
+        without_outer_parentheses_chars(sig_a),
+        without_outer_parentheses_chars(sig_b),
+    ) {
+        (Some(subslice), None) => subslice == sig_b,
+        (None, Some(subslice)) => subslice == sig_a,
+        _ => sig_a == sig_b,
+    }
 }
 
-criterion_group!(benches, criterion_benchmark);
+fn is_equal_bytes(sigpair: (&str, &str)) -> bool {
+    let (sig_a, sig_b) = sigpair;
+    match (
+        without_outer_parentheses_bytes(sig_a),
+        without_outer_parentheses_bytes(sig_b),
+    ) {
+        (Some(subslice), None) => subslice == sig_b.as_bytes(),
+        (None, Some(subslice)) => subslice == sig_a.as_bytes(),
+        _ => sig_a == sig_b,
+    }
+}
+
+fn char_wise(c: &mut Criterion) {
+    c.bench_function("with chars", |b| {
+        b.iter(|| {
+            for sigpair in SIGNATURES {
+                black_box(is_equal_chars(*sigpair));
+            }
+        })
+    });
+}
+
+fn byte_wise(c: &mut Criterion) {
+    c.bench_function("with bytes", |b| {
+        b.iter(|| {
+            for sigpair in SIGNATURES {
+                black_box(is_equal_bytes(*sigpair));
+            }
+        })
+    });
+}
+
+criterion_group!(benches, char_wise, byte_wise);
 criterion_main!(benches);
