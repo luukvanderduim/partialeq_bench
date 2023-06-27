@@ -63,6 +63,23 @@ fn without_outer_parentheses_bytes(sig: &str) -> Option<&[u8]> {
     None
 }
 
+fn without_outer_parentheses_bytes_sliced_str(sig: &str) -> &str {
+    let sig_str = sig;
+
+    if let Some(subslice) = sig_str.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
+        if subslice.chars().fold(0, |count, ch| match ch {
+            '(' => count + 1,
+            ')' if count != 0 => count - 1,
+            _ => count,
+        }) == 0
+        {
+            return subslice;
+        }
+    }
+
+    sig_str
+}
+
 fn is_equal_chars(sigpair: (&str, &str)) -> bool {
     let (sig_a, sig_b) = sigpair;
     match (
@@ -85,6 +102,12 @@ fn is_equal_bytes(sigpair: (&str, &str)) -> bool {
         (None, Some(subslice)) => subslice == sig_a.as_bytes(),
         _ => sig_a == sig_b,
     }
+}
+
+fn is_equal_sliced_str(sigpair: (&str, &str)) -> bool {
+    let (sig_a, sig_b) = sigpair;
+    without_outer_parentheses_bytes_sliced_str(sig_a)
+        == without_outer_parentheses_bytes_sliced_str(sig_b)
 }
 
 pub fn bench_eq(c: &mut Criterion) {
@@ -110,6 +133,13 @@ pub fn bench_eq(c: &mut Criterion) {
             let (str_a, str_b) = (*pair).into();
             b.iter(|| {
                 black_box(is_equal_chars((str_a, str_b)));
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("sliced_str", pair), &pair, |b, pair| {
+            let (str_a, str_b) = (*pair).into();
+            b.iter(|| {
+                black_box(is_equal_sliced_str((str_a, str_b)));
             });
         });
     }
